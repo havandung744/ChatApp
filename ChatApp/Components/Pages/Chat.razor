@@ -1,0 +1,55 @@
+﻿@page "/chat"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+
+<h3>Blazor Chat App</h3>
+
+<input @bind="userInput" placeholder="Enter your name..." />
+<input @bind="messageInput" placeholder="Enter your message..." />
+<button @onclick="SendMessage">Send</button>
+
+<ul>
+    @foreach (var message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+
+@code {
+    private HubConnection _hubConnection;
+    private string userInput;
+    private string messageInput;
+    private List<string> messages = new List<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/chathub"))
+            .Build();
+
+        _hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMessage = $"{user}: {message}";
+            messages.Add(encodedMessage);
+            InvokeAsync(StateHasChanged);
+        });
+
+        await _hubConnection.StartAsync();
+    }
+
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrEmpty(userInput) && !string.IsNullOrEmpty(messageInput))
+        {
+            await _hubConnection.SendAsync("SendMessage", userInput, messageInput);
+            messageInput = string.Empty;
+        }
+    }
+
+    public bool IsConnected => _hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await _hubConnection.DisposeAsync();
+    }
+}
